@@ -1,0 +1,39 @@
+name: Deploy image
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_tag:
+        description: "Image tag to deploy"
+        default: "latest"
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy image
+    runs-on: ubuntu-22.04
+
+    env:
+      AWS_REGION: us-east-1
+      REPOSITORY: safety-beacon-api
+      IMAGE_TAG: ${{ inputs.artifact_tag }}
+
+    steps:
+      - name: Replace existing Docker container on EC2
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          SSH_USER: ${{ secrets.EC2_SSH_USER }}
+          SSH_HOST: ${{ secrets.EC2_SSH_HOST }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          CONTAINER_NAME: ${{ env.REPOSITORY }} # Note: The container is also named the same as the repository
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $SSH_USER@$SSH_HOST "
+            docker stop $CONTAINER_NAME; \
+            docker rm $CONTAINER_NAME; \
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REGISTRY; \
+            docker run -d --name $CONTAINER_NAME --env-file $CONTAINER_NAME.env -p 3000:8080 $REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          rm -f private_key.pem

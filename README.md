@@ -1,12 +1,21 @@
-# Project boilerplate: Go + Gin + Docker + Air
+# Safety Beacon API
+
 A containerised [Gin](https://github.com/gin-gonic/gin) app boilerplate, with a containerised development environment using Air and Docker Compose.
 
-| Component         | Choice                                   |
-| ----------------- | ---------------------------------------- |
-| Language          | [Go](https://go.dev/)                    |
-| Framework         | [Gin](https://github.com/gin-gonic/gin)  |
-| Hot Reloading     | [Air](https://github.com/cosmtrek/air)   |
-| Containerisation  | [Docker](https://www.docker.com/)        |
+| Component        | Choice                                                 |
+| ---------------- | ------------------------------------------------------ |
+| Language         | [Go](https://go.dev/)                                  |
+| HTTP Framework   | [Gin](https://github.com/gin-gonic/gin)                |
+| Hot Reloading    | [Air](https://github.com/cosmtrek/air) (Linux + MacOS) |
+| ORM              | [GORM](https://gorm.io/)                               |
+| Database         | [PostgreSQL](https://www.postgresql.org/)              |
+| Containerisation | [Docker](https://www.docker.com/)                      |
+
+## Environment Variables
+
+| Variable           | Description       |
+| ------------------ | ----------------- |
+| `SUPER_SECRET_KEY` | An example secret |
 
 ## Development
 
@@ -16,7 +25,6 @@ Install the dependancies:
 
 ```bash
 go mod download
-go mod vendor
 go mod verify
 ```
 
@@ -43,8 +51,8 @@ docker compose up
 
 ```bash
 # Build Docker image for production:
-docker build -t gin-air-docker-boilerplate -f Dockerfile.production .
+docker build -t safety-beacon-api -f Dockerfile .
 
 # Example manually running a container with environment variables and ports defined:
-docker run -p 8080:8080 -e SUPER_SECRET_KEY=abc123 gin-air-docker-boilerplate
+docker run -p 8080:8080 -e SUPER_SECRET_KEY=abc123 safety-beacon-api
 ```

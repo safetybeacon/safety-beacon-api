@@ -1,0 +1,82 @@
+name: Build and push image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  get-short-sha:
+    name: Get short SHA
+    runs-on: ubuntu-22.04
+
+    outputs:
+      short-sha: ${{ steps.short-sha.outputs.short-sha }}
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+
+      - name: Get short SHA
+        id: short-sha
+        run: |
+          echo "short-sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build and push image
+    needs: get-short-sha
+    runs-on: ubuntu-22.04
+
+    env:
+      AWS_REGION: us-east-1
+      REPOSITORY: safety-beacon-api
+      IMAGE_TAG: ${{ github.ref_name }}-${{ needs.get-short-sha.outputs.short-sha }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # For building ARM image on x86 runner
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # role-to-assume: arn:aws:iam::123456789012:role/my-github-actions-role
+
+      - name: Login to AWS ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: true
+          registry-type: private
+
+      - name: Build, tag, and push docker image to AWS ECR
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          docker buildx build --platform=linux/arm64 -t $REGISTRY/$REPOSITORY:$IMAGE_TAG -t $REGISTRY/$REPOSITORY:latest . --push
+
+      # - name: Auto-deploy
+      #   env:
+      #     SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+      #     SSH_USER: ${{ secrets.EC2_SSH_USER }}
+      #     SSH_HOST: ${{ secrets.EC2_SSH_HOST }}
+      #     AWS_REGION: ${{ env.AWS_REGION }}
+      #     REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+      #     CONTAINER_NAME: ${{ env.REPOSITORY }} # Note: The container is also named the same as the repository
+      #   run: |
+      #     echo "$SSH_PRIVATE_KEY" > private_key.pem
+      #     chmod 600 private_key.pem
+      #     ssh -o StrictHostKeyChecking=no -i private_key.pem $SSH_USER@$SSH_HOST "
+      #       docker stop $CONTAINER_NAME; \
+      #       docker rm $CONTAINER_NAME; \
+      #       aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REGISTRY; \
+      #       docker run -d --name $CONTAINER_NAME --env-file $CONTAINER_NAME.env -p 3000:8080 $REGISTRY/$REPOSITORY:$IMAGE_TAG"
+      #     rm -f private_key.pem
